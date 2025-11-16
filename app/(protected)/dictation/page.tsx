@@ -1,9 +1,246 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { createAudioRecorder } from '@/lib/audio-recorder';
+import { createAudioSlicer } from '@/lib/audio-slicer';
+import type { AudioRecorder } from '@/lib/audio-recorder';
+import type { AudioSlicer } from '@/lib/audio-slicer';
+
 export default function DictationPage() {
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentTranscription, setCurrentTranscription] = useState('');
+  const [error, setError] = useState('');
+  const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+
+  const recorderRef = useRef<AudioRecorder | null>(null);
+  const slicerRef = useRef<AudioSlicer | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
+
+  const handleStartRecording = async () => {
+    try {
+      setError('');
+      setCurrentTranscription('');
+
+      const recorder = await createAudioRecorder({ mimeType: 'audio/webm' });
+      recorderRef.current = recorder;
+
+      const slicer = createAudioSlicer({ sliceIntervalMs: 5000 });
+      slicerRef.current = slicer;
+
+      slicer.onSlice(async (sliceBlob) => {
+        if (sliceBlob.size === 0) return;
+
+        setIsProcessing(true);
+        try {
+          const formData = new FormData();
+          formData.append('audio', sliceBlob, 'audio.webm');
+          formData.append('sessionId', sessionId);
+
+          const response = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            setCurrentTranscription(data.transcription);
+          } else {
+            setError(data.error || 'Transcription failed');
+          }
+        } catch (err) {
+          setError('Failed to transcribe audio slice');
+          console.error('Transcription error:', err);
+        } finally {
+          setIsProcessing(false);
+        }
+      });
+
+      await recorder.start();
+
+      const chunkInterval = setInterval(() => {
+        if (recorderRef.current && recorderRef.current.isRecording()) {
+          const chunks = recorderRef.current.getChunks();
+          if (chunks.length > 0 && slicerRef.current) {
+            if (!slicerRef.current.isSlicing()) {
+              const initialBlob = new Blob(chunks, { type: 'audio/webm' });
+              slicerRef.current.start(initialBlob);
+            } else {
+              const latestChunk = chunks[chunks.length - 1];
+              if (latestChunk && latestChunk.size > 0) {
+                slicerRef.current.addChunk(latestChunk);
+              }
+            }
+          }
+        } else {
+          clearInterval(chunkInterval);
+        }
+      }, 1000);
+
+      setIsRecording(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start recording');
+      console.error('Recording error:', err);
+    }
+  };
+
+  const handleStopRecording = async () => {
+    try {
+      if (slicerRef.current) {
+        slicerRef.current.stop();
+      }
+
+      if (recorderRef.current) {
+        await recorderRef.current.stop();
+      }
+
+      if (slicerRef.current) {
+        const finalBlob = slicerRef.current.getBufferBlob();
+        if (finalBlob.size > 0) {
+          setIsProcessing(true);
+          try {
+            const formData = new FormData();
+            formData.append('audio', finalBlob, 'audio.webm');
+            formData.append('sessionId', sessionId);
+
+            const response = await fetch('/api/transcribe', {
+              method: 'POST',
+              body: formData,
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              setCurrentTranscription(data.transcription);
+            } else {
+              setError(data.error || 'Final transcription failed');
+            }
+          } catch (err) {
+            setError('Failed to transcribe final audio');
+            console.error('Final transcription error:', err);
+          } finally {
+            setIsProcessing(false);
+          }
+        }
+      }
+
+      setIsRecording(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to stop recording');
+      console.error('Stop recording error:', err);
+    }
+  };
+
+  const handleToggleRecording = () => {
+    if (isRecording) {
+      handleStopRecording();
+    } else {
+      handleStartRecording();
+    }
+  };
+
   return (
-    <div>
-      <h1>Dictation</h1>
-      <p>Voice transcription feature will be implemented here.</p>
+    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <h1 style={{ marginBottom: '2rem' }}>Voice Dictation</h1>
+
+      <div style={{ marginBottom: '2rem' }}>
+        <button
+          onClick={handleToggleRecording}
+          disabled={isProcessing}
+          style={{
+            padding: '1rem 2rem',
+            fontSize: '1.125rem',
+            backgroundColor: isRecording ? '#dc3545' : '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: isProcessing ? 'not-allowed' : 'pointer',
+            fontWeight: 'bold',
+            minWidth: '200px',
+          }}
+        >
+          {isRecording ? '⏹ Stop Recording' : '🎤 Start Recording'}
+        </button>
+      </div>
+
+      {isRecording && (
+        <div style={{
+          padding: '1rem',
+          backgroundColor: '#fff3cd',
+          border: '1px solid #ffc107',
+          borderRadius: '4px',
+          marginBottom: '1rem',
+        }}>
+          <strong>Recording...</strong> Speak into your microphone.
+        </div>
+      )}
+
+      {isProcessing && (
+        <div style={{
+          padding: '1rem',
+          backgroundColor: '#d1ecf1',
+          border: '1px solid #0c5460',
+          borderRadius: '4px',
+          marginBottom: '1rem',
+        }}>
+          <strong>Processing...</strong> Transcribing audio...
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          padding: '1rem',
+          backgroundColor: '#f8d7da',
+          border: '1px solid #dc3545',
+          borderRadius: '4px',
+          marginBottom: '1rem',
+          color: '#721c24',
+        }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      {currentTranscription && (
+        <div style={{
+          padding: '1.5rem',
+          backgroundColor: '#f8f9fa',
+          border: '1px solid #dee2e6',
+          borderRadius: '8px',
+          minHeight: '200px',
+        }}>
+          <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>Transcription</h2>
+          <p style={{
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+            lineHeight: '1.6',
+            margin: 0,
+          }}>
+            {currentTranscription}
+          </p>
+        </div>
+      )}
+
+      {!isRecording && !currentTranscription && (
+        <div style={{
+          padding: '2rem',
+          textAlign: 'center',
+          color: '#6c757d',
+        }}>
+          <p>Click "Start Recording" to begin transcribing your voice.</p>
+          <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+            The transcription will appear here as you speak.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
-
