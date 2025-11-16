@@ -5,6 +5,7 @@ import { createAudioRecorder } from '@/lib/audio-recorder';
 import { createAudioSlicer } from '@/lib/audio-slicer';
 import type { AudioRecorder } from '@/lib/audio-recorder';
 import type { AudioSlicer } from '@/lib/audio-slicer';
+import TranscriptionHistory from '@/components/TranscriptionHistory';
 
 export default function DictationPage() {
   const [isRecording, setIsRecording] = useState(false);
@@ -12,6 +13,7 @@ export default function DictationPage() {
   const [currentTranscription, setCurrentTranscription] = useState('');
   const [error, setError] = useState('');
   const [sessionId] = useState(() => `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const [refreshHistory, setRefreshHistory] = useState(0);
 
   const recorderRef = useRef<AudioRecorder | null>(null);
   const slicerRef = useRef<AudioSlicer | null>(null);
@@ -121,6 +123,7 @@ export default function DictationPage() {
 
             if (data.success) {
               setCurrentTranscription(data.transcription);
+              setRefreshHistory((prev) => prev + 1);
             } else {
               setError(data.error || 'Final transcription failed');
             }
@@ -149,98 +152,106 @@ export default function DictationPage() {
   };
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <h1 style={{ marginBottom: '2rem' }}>Voice Dictation</h1>
+    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+        <div>
+          <h1 style={{ marginBottom: '2rem' }}>Voice Dictation</h1>
 
-      <div style={{ marginBottom: '2rem' }}>
-        <button
-          onClick={handleToggleRecording}
-          disabled={isProcessing}
-          style={{
-            padding: '1rem 2rem',
-            fontSize: '1.125rem',
-            backgroundColor: isRecording ? '#dc3545' : '#28a745',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: isProcessing ? 'not-allowed' : 'pointer',
-            fontWeight: 'bold',
-            minWidth: '200px',
-          }}
-        >
-          {isRecording ? '⏹ Stop Recording' : '🎤 Start Recording'}
-        </button>
+          <div style={{ marginBottom: '2rem' }}>
+            <button
+              onClick={handleToggleRecording}
+              disabled={isProcessing}
+              style={{
+                padding: '1rem 2rem',
+                fontSize: '1.125rem',
+                backgroundColor: isRecording ? '#dc3545' : '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: isProcessing ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold',
+                minWidth: '200px',
+              }}
+            >
+              {isRecording ? '⏹ Stop Recording' : '🎤 Start Recording'}
+            </button>
+          </div>
+
+          {isRecording && (
+            <div style={{
+              padding: '1rem',
+              backgroundColor: '#fff3cd',
+              border: '1px solid #ffc107',
+              borderRadius: '4px',
+              marginBottom: '1rem',
+            }}>
+              <strong>Recording...</strong> Speak into your microphone.
+            </div>
+          )}
+
+          {isProcessing && (
+            <div style={{
+              padding: '1rem',
+              backgroundColor: '#d1ecf1',
+              border: '1px solid #0c5460',
+              borderRadius: '4px',
+              marginBottom: '1rem',
+            }}>
+              <strong>Processing...</strong> Transcribing audio...
+            </div>
+          )}
+
+          {error && (
+            <div style={{
+              padding: '1rem',
+              backgroundColor: '#f8d7da',
+              border: '1px solid #dc3545',
+              borderRadius: '4px',
+              marginBottom: '1rem',
+              color: '#721c24',
+            }}>
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
+          {currentTranscription && (
+            <div style={{
+              padding: '1.5rem',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #dee2e6',
+              borderRadius: '8px',
+              minHeight: '200px',
+            }}>
+              <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>Current Transcription</h2>
+              <p style={{
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+                lineHeight: '1.6',
+                margin: 0,
+              }}>
+                {currentTranscription}
+              </p>
+            </div>
+          )}
+
+          {!isRecording && !currentTranscription && (
+            <div style={{
+              padding: '2rem',
+              textAlign: 'center',
+              color: '#6c757d',
+            }}>
+              <p>Click "Start Recording" to begin transcribing your voice.</p>
+              <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                The transcription will appear here as you speak.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <TranscriptionHistory refreshTrigger={refreshHistory} />
+        </div>
       </div>
-
-      {isRecording && (
-        <div style={{
-          padding: '1rem',
-          backgroundColor: '#fff3cd',
-          border: '1px solid #ffc107',
-          borderRadius: '4px',
-          marginBottom: '1rem',
-        }}>
-          <strong>Recording...</strong> Speak into your microphone.
-        </div>
-      )}
-
-      {isProcessing && (
-        <div style={{
-          padding: '1rem',
-          backgroundColor: '#d1ecf1',
-          border: '1px solid #0c5460',
-          borderRadius: '4px',
-          marginBottom: '1rem',
-        }}>
-          <strong>Processing...</strong> Transcribing audio...
-        </div>
-      )}
-
-      {error && (
-        <div style={{
-          padding: '1rem',
-          backgroundColor: '#f8d7da',
-          border: '1px solid #dc3545',
-          borderRadius: '4px',
-          marginBottom: '1rem',
-          color: '#721c24',
-        }}>
-          <strong>Error:</strong> {error}
-        </div>
-      )}
-
-      {currentTranscription && (
-        <div style={{
-          padding: '1.5rem',
-          backgroundColor: '#f8f9fa',
-          border: '1px solid #dee2e6',
-          borderRadius: '8px',
-          minHeight: '200px',
-        }}>
-          <h2 style={{ marginTop: 0, marginBottom: '1rem' }}>Transcription</h2>
-          <p style={{
-            whiteSpace: 'pre-wrap',
-            wordWrap: 'break-word',
-            lineHeight: '1.6',
-            margin: 0,
-          }}>
-            {currentTranscription}
-          </p>
-        </div>
-      )}
-
-      {!isRecording && !currentTranscription && (
-        <div style={{
-          padding: '2rem',
-          textAlign: 'center',
-          color: '#6c757d',
-        }}>
-          <p>Click "Start Recording" to begin transcribing your voice.</p>
-          <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
-            The transcription will appear here as you speak.
-          </p>
-        </div>
-      )}
     </div>
   );
 }
