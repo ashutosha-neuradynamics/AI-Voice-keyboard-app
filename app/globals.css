@@ -34,3 +34,20 @@ body {
   }
 }
 
+@media (min-width: 768px) {
+  /* Desktop: Sidebar always visible */
+  .sidebar {
+    left: 0 !important;
+  }
+  
+  /* Hide mobile menu button on desktop */
+  button[aria-label="Toggle menu"] {
+    display: none !important;
+  }
+  
+  /* Adjust main content margin for desktop */
+  main {
+    margin-left: 250px !important;
+  }
+}
+
