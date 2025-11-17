@@ -268,7 +268,7 @@ export default function DictationPage() {
               textAlign: 'center',
               color: '#6c757d',
             }}>
-              <p>Click "Start Recording" to begin transcribing your voice.</p>
+              <p>Click &quot;Start Recording&quot; to begin transcribing your voice.</p>
               <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
                 The transcription will appear here as you speak.
               </p>
