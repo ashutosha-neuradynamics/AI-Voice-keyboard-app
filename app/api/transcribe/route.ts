@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth-options';
 import { query } from '@/lib/db';
 import { transcribeAudio } from '@/lib/whisper-api';
 import { mergeTranscriptions } from '@/lib/transcription-merger';
