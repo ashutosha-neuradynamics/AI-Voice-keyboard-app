@@ -39,6 +39,37 @@ DB_USER=your_username
 DB_PASSWORD=your_password
 ```
 
+#### Generate NextAuth Secret
+
+You need to generate a secure secret for NextAuth.js. Use one of these methods:
+
+**Method 1: Using OpenSSL (Recommended)**
+```bash
+openssl rand -base64 32
+```
+
+**Method 2: Using Node.js**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+**Method 3: Using PowerShell (Windows)**
+```powershell
+[Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Minimum 0 -Maximum 256 }))
+```
+
+Copy the generated secret and add it to your `.env` file:
+
+```env
+NEXTAUTH_SECRET=your-generated-secret-here
+NEXTAUTH_URL=http://localhost:3000
+```
+
+**Important:** 
+- Use a different secret for production
+- Never commit your `.env` file to version control
+- Keep your secret secure and don't share it publicly
+
 ### 3. Create PostgreSQL Database
 
 Make sure PostgreSQL is running and create a database:

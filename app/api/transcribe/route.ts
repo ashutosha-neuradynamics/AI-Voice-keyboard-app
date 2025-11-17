@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const audioFile = formData.get('audio') as File;
     const sessionId = formData.get('sessionId') as string;
+    const isFinal = formData.get('isFinal') === 'true';
 
     if (!audioFile) {
       return NextResponse.json(
@@ -43,27 +44,41 @@ export async function POST(request: NextRequest) {
     const newTranscription = await transcribeAudio(audioBuffer, dictionaryEntries);
 
     let finalTranscription = newTranscription;
+    let existingTranscriptionId: number | null = null;
 
     if (sessionId) {
       const existingResult = await query(
-        'SELECT text FROM transcriptions WHERE user_id = $1 AND metadata->>\'sessionId\' = $2 ORDER BY created_at DESC LIMIT 1',
+        'SELECT id, text FROM transcriptions WHERE user_id = $1 AND metadata->>\'sessionId\' = $2 ORDER BY created_at DESC LIMIT 1',
         [userId, sessionId]
       );
 
       if (existingResult.rows.length > 0) {
-        const existingText = existingResult.rows[0].text;
-        finalTranscription = mergeTranscriptions([existingText, newTranscription]);
+        const existingText = existingResult.rows[0].text as string;
+        existingTranscriptionId = existingResult.rows[0].id as number;
+
+        if (!isFinal) {
+          finalTranscription = mergeTranscriptions([existingText, newTranscription]);
+        }
       }
     }
 
-    const result = await query(
-      'INSERT INTO transcriptions (user_id, text, metadata) VALUES ($1, $2, $3) RETURNING id, text, created_at',
-      [
-        userId,
-        finalTranscription,
-        JSON.stringify({ sessionId: sessionId || null }),
-      ]
-    );
+    let result;
+
+    if (existingTranscriptionId) {
+      result = await query(
+        'UPDATE transcriptions SET text = $1, created_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, text, created_at',
+        [finalTranscription, existingTranscriptionId]
+      );
+    } else {
+      result = await query(
+        'INSERT INTO transcriptions (user_id, text, metadata) VALUES ($1, $2, $3) RETURNING id, text, created_at',
+        [
+          userId,
+          finalTranscription,
+          JSON.stringify({ sessionId: sessionId || null }),
+        ]
+      );
+    }
 
     return NextResponse.json({
       success: true,

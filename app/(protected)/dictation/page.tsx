@@ -120,6 +120,8 @@ export default function DictationPage() {
 
   const handleStopRecording = async () => {
     try {
+      setIsRecording(false);
+
       if (chunkIntervalRef.current) {
         clearInterval(chunkIntervalRef.current);
         chunkIntervalRef.current = null;
@@ -141,6 +143,7 @@ export default function DictationPage() {
             const formData = new FormData();
             formData.append('audio', finalBlob, 'audio.webm');
             formData.append('sessionId', sessionId);
+            formData.append('isFinal', 'true');
 
             const response = await fetch('/api/transcribe', {
               method: 'POST',
@@ -164,7 +167,6 @@ export default function DictationPage() {
         }
       }
 
-      setIsRecording(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to stop recording');
       console.error('Stop recording error:', err);

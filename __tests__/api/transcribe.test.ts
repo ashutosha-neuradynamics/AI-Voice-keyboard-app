@@ -158,5 +158,43 @@ describe('Transcription API', () => {
     expect(response.status).toBe(400);
     expect(data.error).toContain('audio');
   });
+
+  it('should keep a single transcription row per session', async () => {
+    const { transcribeAudio } = require('@/lib/whisper-api');
+    transcribeAudio
+      .mockResolvedValueOnce('First part')
+      .mockResolvedValueOnce('Second part');
+
+    const sessionId = 'test-session-single-row';
+
+    const createRequestWithAudio = (isFinal = false) => {
+      const formData = new FormData();
+      const audioBlob = new Blob(['audio data'], { type: 'audio/webm' });
+      formData.append('audio', audioBlob, 'audio.webm');
+      formData.append('sessionId', sessionId);
+      if (isFinal) {
+        formData.append('isFinal', 'true');
+      }
+
+      return new NextRequest('http://localhost:3000/api/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+    };
+
+    const firstResponse = await POST(createRequestWithAudio());
+    expect(firstResponse.status).toBe(200);
+
+    const secondResponse = await POST(createRequestWithAudio(true));
+    expect(secondResponse.status).toBe(200);
+
+    const dbResult = await query(
+      'SELECT text FROM transcriptions WHERE user_id = $1 AND metadata->>\'sessionId\' = $2',
+      [testUserId, sessionId]
+    );
+
+    expect(dbResult.rows.length).toBe(1);
+    expect(dbResult.rows[0].text).toBe('Second part');
+  });
 });
 
