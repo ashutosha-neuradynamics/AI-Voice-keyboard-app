@@ -17,12 +17,18 @@ export default function DictationPage() {
 
   const recorderRef = useRef<AudioRecorder | null>(null);
   const slicerRef = useRef<AudioSlicer | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const chunkIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+      if (chunkIntervalRef.current) {
+        clearInterval(chunkIntervalRef.current);
+      }
+      if (recorderRef.current && recorderRef.current.isRecording()) {
+        recorderRef.current.stop();
+      }
+      if (slicerRef.current) {
+        slicerRef.current.stop();
       }
     };
   }, []);
@@ -31,6 +37,11 @@ export default function DictationPage() {
     try {
       setError('');
       setCurrentTranscription('');
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Your browser does not support audio recording. Please use a modern browser like Chrome, Firefox, or Edge.');
+        return;
+      }
 
       const recorder = await createAudioRecorder({ mimeType: 'audio/webm' });
       recorderRef.current = recorder;
@@ -69,24 +80,36 @@ export default function DictationPage() {
 
       await recorder.start();
 
-      const chunkInterval = setInterval(() => {
-        if (recorderRef.current && recorderRef.current.isRecording()) {
+      let lastChunkCount = 0;
+      chunkIntervalRef.current = setInterval(() => {
+        if (recorderRef.current && recorderRef.current.isRecording() && slicerRef.current) {
           const chunks = recorderRef.current.getChunks();
-          if (chunks.length > 0 && slicerRef.current) {
+          
+          if (chunks.length > lastChunkCount) {
+            const newChunks = chunks.slice(lastChunkCount);
+            
             if (!slicerRef.current.isSlicing()) {
-              const initialBlob = new Blob(chunks, { type: 'audio/webm' });
-              slicerRef.current.start(initialBlob);
-            } else {
-              const latestChunk = chunks[chunks.length - 1];
-              if (latestChunk && latestChunk.size > 0) {
-                slicerRef.current.addChunk(latestChunk);
+              if (newChunks.length > 0) {
+                const initialBlob = new Blob(newChunks, { type: 'audio/webm' });
+                slicerRef.current.start(initialBlob);
               }
+            } else {
+              newChunks.forEach((chunk) => {
+                if (chunk && chunk.size > 0) {
+                  slicerRef.current?.addChunk(chunk);
+                }
+              });
             }
+            
+            lastChunkCount = chunks.length;
           }
         } else {
-          clearInterval(chunkInterval);
+          if (chunkIntervalRef.current) {
+            clearInterval(chunkIntervalRef.current);
+            chunkIntervalRef.current = null;
+          }
         }
-      }, 1000);
+      }, 500);
 
       setIsRecording(true);
     } catch (err) {
@@ -97,6 +120,11 @@ export default function DictationPage() {
 
   const handleStopRecording = async () => {
     try {
+      if (chunkIntervalRef.current) {
+        clearInterval(chunkIntervalRef.current);
+        chunkIntervalRef.current = null;
+      }
+
       if (slicerRef.current) {
         slicerRef.current.stop();
       }

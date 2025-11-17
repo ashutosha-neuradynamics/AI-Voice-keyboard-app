@@ -21,9 +21,14 @@ export async function createAudioRecorder(
 
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-  const recorder = new MediaRecorder(stream, {
-    mimeType: options.mimeType || 'audio/webm',
-  });
+  const mimeType = options.mimeType || 'audio/webm';
+  let recorder: MediaRecorder;
+  
+  try {
+    recorder = new MediaRecorder(stream, { mimeType });
+  } catch (err) {
+    recorder = new MediaRecorder(stream);
+  }
 
   let state: AudioRecorderState = 'idle';
   const chunks: Blob[] = [];
@@ -37,7 +42,7 @@ export async function createAudioRecorder(
   const start = async () => {
     if (state === 'recording') return;
     chunks.length = 0;
-    recorder.start();
+    recorder.start(1000);
     state = 'recording';
   };
 
@@ -46,6 +51,7 @@ export async function createAudioRecorder(
     return new Promise<void>((resolve) => {
       const handleStop = () => {
         recorder.removeEventListener('stop', handleStop);
+        stream.getTracks().forEach((track) => track.stop());
         state = 'idle';
         resolve();
       };
