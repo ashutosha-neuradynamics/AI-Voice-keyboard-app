@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth-options';
+import { authOptions } from '../api/auth/[...nextauth]/route';
 import Sidebar from '@/components/Sidebar';
 
 export default async function ProtectedLayout({

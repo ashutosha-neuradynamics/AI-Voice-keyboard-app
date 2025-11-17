@@ -3,7 +3,7 @@ import { POST } from '@/app/api/transcribe/route';
 import { query } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth-options';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 jest.mock('next-auth/next');
 jest.mock('@/lib/whisper-api');
