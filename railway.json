@@ -1,0 +1,11 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "buildCommand": "npm run build"
+  },
+  "deploy": {
+    "startCommand": "node .next/standalone/server.js",
+    "preDeployCommand": ["npm", "run", "migrate"],
+    "healthcheckPath": "/api/health"
+  }
+}
