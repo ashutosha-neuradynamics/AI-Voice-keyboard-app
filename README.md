@@ -78,6 +78,22 @@ Make sure PostgreSQL is running and create a database:
 CREATE DATABASE your_database_name;
 ```
 
+#### Run PostgreSQL with Docker Compose (optional)
+
+If you do not have PostgreSQL installed locally, use Docker:
+
+```bash
+docker compose up -d
+```
+
+The included `docker-compose.yml` starts Postgres on `localhost:5432` with:
+
+- DB name: `database_name`
+- User: `username`
+- Password: `password`
+
+These defaults match the sample values in `.env`.
+
 ### 4. Run Database Migrations
 
 Run the migrations to set up the database schema:
