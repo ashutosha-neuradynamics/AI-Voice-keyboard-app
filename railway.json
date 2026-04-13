@@ -5,7 +5,6 @@
   },
   "deploy": {
     "startCommand": "node .next/standalone/server.js",
-    "preDeployCommand": "npm run migrate",
-    "healthcheckPath": "/api/health"
+    "preDeployCommand": "npm run migrate"
   }
 }
